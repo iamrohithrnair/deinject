@@ -6,6 +6,19 @@ DeInject is an in-flight token sandbox for AI search and publisher/SSP stacks. I
 
 ---
 
+## Scientific foundation
+
+Every component in DeInject maps to verified, peer-reviewed research:
+
+| # | DeInject component | Paper | Link |
+|---|-------------------|-------|------|
+| 1 | **Token sandbox & segmented verification** — DOM/scraped text is split into discrete segments; each block is checked for semantic consistency with the user task in an isolated loop | *WebSentinel: Detecting and Localizing Prompt Injection Attacks for Web Agents* — Xilong Wang, Yinuo Liu, Zhun Wang, Dawn Song, Neil Gong (Duke & UC Berkeley) | [ResearchGate](https://www.researchgate.net/publication/400415118_WebSentinel_Detecting_and_Localizing_Prompt_Injection_Attacks_for_Web_Agents) |
+| 2 | **Multi-signal fusion engine** — rolling threat vector \(s_t\) from static content + structural runtime signals to catch sparse, hidden, obfuscated ad behavior | *MANA: Towards Efficient Mobile Ad Detection via Multimodal Agentic UI Navigation* — Yongjian Fu et al. (Tsinghua University) | [arXiv](https://arxiv.org/abs/2603.20351) |
+| 3 | **Threat matrix (white-on-white IPI)** — environment-level taxonomy of how web-scraping agents are vulnerable to hidden adversarial text that forces unauthorized outcomes | *SecureWebArena: A Holistic Security Evaluation Benchmark for LVLM-based Web Agents* — Frontier AI Security Consortium | [arXiv](https://arxiv.org/abs/2510.10073) |
+| 4 | **Contextual ad benchmarking** — commercial justification: real-time contextual ad auctions must balance precision with user-perceived safety and alignment | *Beyond Precision: Understanding the Impact of Algorithmic Accuracy and Transparency on User Perceptions in Keyword-Driven Contextual Advertising* (CHI 2026) — Jingwen Cai, Johanna Björklund (Umeå University) | [DiVA PDF](https://www.diva-portal.org/smash/get/diva2:2053326/FULLTEXT01.pdf) |
+
+---
+
 ## The core problem: ad forgery via hidden prompt injection
 
 In AI search engines, ads are triggered by **semantic context**, not static keywords. Threat actors exploit this by poisoning third-party pages with **Indirect Prompt Injections (IPI)** hidden from human view—for example white text on a white background, or `font-size: 0px`.
