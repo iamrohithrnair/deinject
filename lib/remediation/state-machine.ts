@@ -1,0 +1,69 @@
+import { getFirewallAd, getLegitAd } from "@/lib/ads/registry";
+import type {
+  AdUnit,
+  SecurityTelemetry,
+  TextSegment,
+} from "@/lib/types";
+
+const THREAT_THRESHOLD = 0.6;
+
+export interface RemediationResult {
+  summaryPrompt: string;
+  processedContextFeed: string;
+  activeAdUnit: AdUnit;
+}
+
+export function remediateContext(
+  query: string,
+  segments: TextSegment[],
+  telemetry: SecurityTelemetry
+): RemediationResult {
+  let activeAdUnit = getLegitAd();
+  let summaryPrompt = "";
+  let processedContextFeed = "";
+
+  const exploitTripped =
+    telemetry.isInjected || telemetry.fusedThreatScore > THREAT_THRESHOLD;
+
+  if (exploitTripped) {
+    if (telemetry.remediationAction === "TARGETED_TRUNCATION") {
+      const safeSegments = segments.filter((_, idx) => {
+        const report = telemetry.segmentReport.find((r) => r.index === idx);
+        return report ? !report.exploitSignatureDetected : true;
+      });
+      processedContextFeed = safeSegments
+        .map((s) => `[Source: ${s.sourceTitle}] ${s.textChunk}`)
+        .join("\n\n");
+
+      summaryPrompt = `
+Synthesize a safe response for the user query: "${query}".
+Note: Certain retrieved web segments were intercepted and purged by our firewall for security non-compliance.
+Rely strictly on this sanitized content feed to answer:
+"""
+${processedContextFeed}
+"""
+`;
+    } else {
+      processedContextFeed =
+        "/* ALL INGESTED WEB CONTEXT FLUSHED - ACTIVE PROMPT INJECTION MITIGATION ENGAGED */";
+      summaryPrompt = `
+The user initiated a search for: "${query}".
+Third-party data contained active, highly malicious prompt injections attempting to bypass system guardrails.
+Acknowledge the user's intent transparently, state that a web-based Indirect Prompt Injection exploit was detected and neutralized via Segmented Context Isolation, and offer high-level general facts on the topic without ingesting the poisoned data.
+`;
+      activeAdUnit = getFirewallAd();
+    }
+  } else {
+    processedContextFeed = segments.map((s) => s.textChunk).join("\n\n");
+    summaryPrompt = `
+Synthesize an objective, data-driven response using this verified web context.
+User Query: "${query}"
+Context Feed:
+"""
+${processedContextFeed}
+"""
+`;
+  }
+
+  return { summaryPrompt, processedContextFeed, activeAdUnit };
+}
