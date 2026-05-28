@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runDeinjectAgent } from "@/lib/agent/run-pipeline";
 import { hasCursorApiKey, CURSOR_API_KEY_ENV } from "@/lib/agent/env";
 import { searchWeb } from "@/lib/ingestion/tavily";
 import { segmentWebResults } from "@/lib/science/segmentation";
@@ -30,6 +29,7 @@ export async function POST(req: NextRequest) {
     const { results } = await searchWeb(query);
     const segments = segmentWebResults(results);
 
+    const { runDeinjectAgent } = await import("@/lib/agent/run-pipeline");
     const { response, agentRunId } = await runDeinjectAgent(query, segments);
 
     return NextResponse.json({

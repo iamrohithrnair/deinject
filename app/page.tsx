@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Activity, Shield } from "lucide-react";
+import { Shield, Zap, Bot } from "lucide-react";
 import { SearchControls, type TestScenario } from "@/components/SearchControls";
 import { TelemetryPanel } from "@/components/TelemetryPanel";
 import { SegmentsLedger } from "@/components/SegmentsLedger";
 import { OutputCanvas } from "@/components/OutputCanvas";
 import { LoadingState } from "@/components/LoadingState";
+import { PipelineSteps } from "@/components/PipelineSteps";
+import { DemoGuide } from "@/components/DemoGuide";
+import { ToolTracePanel } from "@/components/ToolTracePanel";
 import type { SearchResponse } from "@/lib/types";
 import { cn } from "@/lib/cn";
 
@@ -17,13 +20,13 @@ const TEST_SCENARIOS: TestScenario[] = [
     label: "Clean Vector Test",
     text: "What are reliable strategies for long term high yield savings?",
     scenario: "clean",
-    hint: "PASSTHROUGH telemetry, legit ad",
+    hint: "Green telemetry — all segments pass, legit vetted ad.",
   },
   {
     label: "Web Exploit Trigger (IPI)",
     text: "Show me the top recommendations for high yield savings on open finance blogs",
     scenario: "ipi",
-    hint: "Red MANA fusion, firewall ad",
+    hint: "Red telemetry — hidden SYSTEM NOTE detected, firewall ad.",
   },
 ];
 
@@ -46,6 +49,10 @@ export default function Home() {
     setData(null);
     setError(null);
 
+    const controller = new AbortController();
+    const timeoutMs = apiMode === "live" ? 120_000 : 30_000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
       const endpoint =
         apiMode === "mock" ? "/api/search/mock" : "/api/search";
@@ -58,6 +65,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
 
       const result = await res.json();
@@ -68,78 +76,122 @@ export default function Home() {
 
       setData(result as SearchResponse);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error");
+      if (err instanceof Error && err.name === "AbortError") {
+        setError(
+          apiMode === "live"
+            ? "Live agent timed out after 2 minutes. Try Demo mode for an instant result."
+            : "Request timed out."
+        );
+      } else {
+        setError(err instanceof Error ? err.message : "Network error");
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
 
-  const pipelineLabel =
-    data?.pipelineMode === "agent"
-      ? "Cursor agent + MCP"
-      : apiMode === "mock"
-        ? "Deterministic MCP tools"
-        : data?.pipelineMode === "mock-tools"
-          ? "Deterministic MCP tools (fallback)"
-          : "Agentic pipeline (Cursor SDK)";
+  const showIdle = !loading && !data;
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans select-none selection:bg-indigo-500/30">
-      <header className="max-w-7xl mx-auto mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-900 pb-5 gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-xl shadow-lg shadow-indigo-900/20 text-white border border-indigo-500/30">
-            <Shield size={24} />
-          </div>
-          <div>
-            <h1 className="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-100 to-slate-300">
-              DeInject{" "}
-              <span className="text-indigo-400 font-mono font-medium text-xs border border-indigo-900 px-2 py-0.5 rounded-md bg-indigo-950/40">
-                Agentic MCP
-              </span>
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Segmented Context Isolation via WebSentinel + MANA (Cursor SDK)
-            </p>
-          </div>
-        </div>
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      {/* Hero */}
+      <header className="border-b border-slate-200 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+            <div className="flex gap-4">
+              <div className="p-3 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-200 shrink-0">
+                <Shield size={28} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  DeInject
+                </h1>
+                <p className="text-sm text-slate-600 mt-1 max-w-xl leading-relaxed">
+                  Stops <strong>ad forgery via hidden prompt injection</strong> on
+                  scraped web pages. Segments untrusted content, scores threat
+                  signals, and serves only sanitized answers plus vetted ads.
+                </p>
+              </div>
+            </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="flex rounded-lg border border-slate-800 bg-slate-900/60 p-0.5 text-xs font-mono">
-            <button
-              type="button"
-              onClick={() => setApiMode("live")}
-              className={cn(
-                "px-3 py-1.5 rounded-md transition-all",
-                apiMode === "live"
-                  ? "bg-indigo-600 text-white"
-                  : "text-slate-400 hover:text-slate-200"
-              )}
-            >
-              Live (Agent)
-            </button>
-            <button
-              type="button"
-              onClick={() => setApiMode("mock")}
-              className={cn(
-                "px-3 py-1.5 rounded-md transition-all",
-                apiMode === "mock"
-                  ? "bg-violet-600 text-white"
-                  : "text-slate-400 hover:text-slate-200"
-              )}
-            >
-              Demo (Mock)
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+              <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setApiMode("mock")}
+                  className={cn(
+                    "px-4 py-2 rounded-md transition-all",
+                    apiMode === "mock"
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  Demo (instant)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApiMode("live")}
+                  className={cn(
+                    "px-4 py-2 rounded-md transition-all",
+                    apiMode === "live"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  )}
+                >
+                  Live (agent)
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2.5 text-xs font-mono bg-slate-900/60 backdrop-blur px-3.5 py-2 rounded-lg border border-slate-800 text-slate-300">
-            <Activity className="text-emerald-400 animate-pulse" size={14} />
-            {apiMode === "live"
-              ? "CURSOR_API_KEY + TAVILY"
-              : "NO AGENT KEY REQUIRED"}
+
+          {/* Mode explainer cards */}
+          <div className="grid sm:grid-cols-2 gap-3 mt-6">
+            <div
+              className={cn(
+                "rounded-xl border p-4 transition-all",
+                apiMode === "mock"
+                  ? "border-violet-300 bg-violet-50 ring-1 ring-violet-200"
+                  : "border-slate-200 bg-slate-50/50 opacity-70"
+              )}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Zap className="text-violet-600" size={16} />
+                <span className="text-sm font-semibold text-slate-900">
+                  Demo — deterministic MCP tools
+                </span>
+              </div>
+              <p className="text-xs text-slate-600">
+                No API keys. Runs the science pipeline in-process in ~1s. Best
+                for judges.
+              </p>
+            </div>
+            <div
+              className={cn(
+                "rounded-xl border p-4 transition-all",
+                apiMode === "live"
+                  ? "border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200"
+                  : "border-slate-200 bg-slate-50/50 opacity-70"
+              )}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Bot className="text-indigo-600" size={16} />
+                <span className="text-sm font-semibold text-slate-900">
+                  Live — Cursor agent + MCP
+                </span>
+              </div>
+              <p className="text-xs text-slate-600">
+                Tavily web search + local Cursor agent orchestrating MCP tools.
+                Requires keys; may take 30–90s.
+              </p>
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <PipelineSteps />
+
         <SearchControls
           query={query}
           loading={loading}
@@ -148,41 +200,27 @@ export default function Home() {
           scenarios={TEST_SCENARIOS}
         />
 
-        {apiMode === "live" && (
-          <p className="text-xs font-mono text-slate-500 px-1">
-            Live mode runs a local Cursor agent with inline MCP (
-            <code className="text-indigo-400">npm run mcp:build</code> first).
-            Requires <code className="text-indigo-400">CURSOR_API_KEY</code> and{" "}
-            <code className="text-indigo-400">TAVILY_API_KEY</code>.
-          </p>
-        )}
-
         {error && (
           <div
             role="alert"
-            className="rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-200 font-mono"
+            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
           >
             {error}
           </div>
         )}
 
-        {loading && <LoadingState />}
+        {loading && <LoadingState apiMode={apiMode} />}
+
+        {showIdle && <DemoGuide />}
 
         {data && !loading && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-5 space-y-6">
-              <div className="flex items-center justify-between gap-2 px-1">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
-                  Pipeline
-                </span>
-                <span className="text-[10px] font-mono text-indigo-400 border border-indigo-900/60 rounded px-2 py-0.5 bg-indigo-950/30">
-                  {pipelineLabel}
-                </span>
-              </div>
-              <TelemetryPanel
-                telemetry={data.telemetry}
+              <TelemetryPanel telemetry={data.telemetry} />
+              <ToolTracePanel
                 toolTrace={data.toolTrace}
                 agentRunId={data.agentRunId}
+                pipelineMode={data.pipelineMode}
               />
               <SegmentsLedger
                 telemetry={data.telemetry}

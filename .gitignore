@@ -53,3 +53,7 @@ Thumbs.db
 # Misc
 *.pem
 .cache/
+
+# Demo capture scratch frames
+demo/reel-*/
+demo/frames-*/

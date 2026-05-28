@@ -51,6 +51,29 @@ This repo implements that pipeline with **deterministic MCP science tools**, a *
 
 ---
 
+## Demo
+
+![DeInject judge demo — IPI detection and remediation](demo/deinject-demo.gif)
+
+**What this shows (≈8 seconds):**
+
+1. **Landing** — pipeline overview and judge quick-start guide  
+2. **Web Exploit Trigger (IPI)** — hidden `SYSTEM NOTE` injection detected (`s_t = 100%`), poisoned segment quarantined, safe answer + firewall ad  
+3. **Clean Vector Test** — green telemetry, all segments pass, legit vetted ad  
+
+**Live in the app:** `npm run dev` → open [http://localhost:3000](http://localhost:3000) → **Demo (instant)** → click **Web Exploit Trigger (IPI)**.
+
+**Re-record the GIF** (dev server must be running):
+
+```bash
+npm run dev          # terminal 1
+./scripts/record-demo.sh   # terminal 2 → writes demo/deinject-demo.gif
+```
+
+Requires [Playwright](https://playwright.dev/) Chromium (`npm install --no-save playwright && npx playwright install chromium` on first run).
+
+---
+
 ## Requirements
 
 - Node.js **>= 20.9.0**
@@ -61,10 +84,11 @@ This repo implements that pipeline with **deterministic MCP science tools**, a *
 
 ```bash
 npm install
-npm run mcp:build
+npm run mcp:build   # required before Live (agent) mode
 cp .env.local.example .env.local
 # Add TAVILY_API_KEY and CURSOR_API_KEY to .env.local
-npm run dev
+npm run dev         # Webpack dev server (fast compile)
+# or: npm run dev:clean   # clear .next cache + start fresh
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -93,11 +117,14 @@ Get a Cursor API key from [Cursor Dashboard → Integrations](https://cursor.com
 ## Scripts
 
 ```bash
-npm run dev        # Next.js development server
+npm run dev        # Webpack dev server (recommended)
+npm run dev:clean  # Clear .next cache and start fresh
+npm run dev:turbo  # Turbopack (optional)
 npm run mcp:build  # Compile deinject-science MCP server
 npm run build      # MCP build + production Next build
-npm run start      # serve production build
+npm run start      # Serve production build
 npm run lint       # ESLint
+npm run record:demo # Capture demo GIF (see Demo section)
 ```
 
 ## Architecture
