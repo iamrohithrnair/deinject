@@ -1,13 +1,19 @@
 "use client";
 
 import { AlertTriangle, CheckCircle, Cpu } from "lucide-react";
-import type { SecurityTelemetry } from "@/lib/types";
+import type { SecurityTelemetry, ToolTraceEntry } from "@/lib/types";
 
 interface TelemetryPanelProps {
   telemetry: SecurityTelemetry;
+  toolTrace?: ToolTraceEntry[];
+  agentRunId?: string;
 }
 
-export function TelemetryPanel({ telemetry }: TelemetryPanelProps) {
+export function TelemetryPanel({
+  telemetry,
+  toolTrace,
+  agentRunId,
+}: TelemetryPanelProps) {
   const offending = telemetry.segmentReport.find(
     (r) => r.exploitSignatureDetected
   )?.offendingTextFragment;
@@ -53,7 +59,31 @@ export function TelemetryPanel({ telemetry }: TelemetryPanelProps) {
             {telemetry.remediationAction}
           </span>
           .
+          {agentRunId && (
+            <span className="block mt-2 text-slate-500 text-[10px]">
+              agent run: {agentRunId}
+            </span>
+          )}
         </div>
+
+        {toolTrace && toolTrace.length > 0 && (
+          <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
+            <span className="text-slate-500 font-bold font-mono block mb-2 text-[10px] uppercase">
+              MCP tool trace
+            </span>
+            <ul className="space-y-1.5 max-h-36 overflow-y-auto">
+              {toolTrace.map((entry, i) => (
+                <li
+                  key={`${entry.tool}-${i}`}
+                  className="font-mono text-[10px] text-slate-400 flex gap-2"
+                >
+                  <span className="text-violet-400 shrink-0">{entry.tool}</span>
+                  <span className="text-slate-500 truncate">{entry.summary}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {telemetry.isInjected && (
           <div className="bg-red-950/40 border border-red-900/50 p-4 rounded-xl space-y-2">

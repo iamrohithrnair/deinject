@@ -1,11 +1,48 @@
-import { getFirewallAd, getLegitAd } from "@/lib/ads/registry";
+import { getFirewallAd, getLegitAd } from "../ads/registry";
 import type {
   AdUnit,
+  RemediationAction,
   SecurityTelemetry,
   TextSegment,
-} from "@/lib/types";
+} from "../types";
 
-const THREAT_THRESHOLD = 0.6;
+export const THREAT_THRESHOLD = 0.6;
+
+export function isExploitTripped(
+  telemetry: Pick<SecurityTelemetry, "isInjected" | "fusedThreatScore">
+): boolean {
+  return (
+    telemetry.isInjected || telemetry.fusedThreatScore > THREAT_THRESHOLD
+  );
+}
+
+export function selectRemediationAction(
+  telemetry: Pick<
+    SecurityTelemetry,
+    "fusedThreatScore" | "isInjected" | "segmentReport"
+  >
+): RemediationAction {
+  const exploitTripped = isExploitTripped(telemetry);
+
+  if (!exploitTripped) {
+    return "PASSTHROUGH";
+  }
+
+  const exploitCount = telemetry.segmentReport.filter(
+    (r) => r.exploitSignatureDetected
+  ).length;
+  const total = telemetry.segmentReport.length;
+
+  if (exploitCount > 0 && exploitCount < total) {
+    return "TARGETED_TRUNCATION";
+  }
+
+  return "FALLBACK_SAFE_REPLAY";
+}
+
+export function getVettedAdUnit(exploitTripped: boolean): AdUnit {
+  return exploitTripped ? getFirewallAd() : getLegitAd();
+}
 
 export interface RemediationResult {
   summaryPrompt: string;
@@ -13,7 +50,7 @@ export interface RemediationResult {
   activeAdUnit: AdUnit;
 }
 
-export function remediateContext(
+export function buildRemediationContext(
   query: string,
   segments: TextSegment[],
   telemetry: SecurityTelemetry

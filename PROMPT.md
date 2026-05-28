@@ -9,7 +9,11 @@
 
 ## 2. Pipeline
 
-Query → Tavily retrieval → WebSentinel segmentation → MANA firewall (generateObject + Zod) → Remediation FSM → Sanitized answer + vetted ad unit.
+Query → Tavily retrieval → WebSentinel segmentation → MANA tools (MCP) → Remediation FSM → Cursor agent synthesis → Sanitized answer + vetted ad unit.
+
+**Live:** `lib/agent/run-pipeline.ts` drives a local Cursor agent with inline stdio MCP (`deinject-science`).
+
+**Mock:** `lib/mcp/invoke-tools.ts` runs the same tool handlers in-process (deterministic, no agent).
 
 ## 3. Remediation thresholds
 
@@ -19,9 +23,9 @@ If `isInjected || fusedThreatScore > 0.60`:
 
 ## 4. APIs
 
-- `POST /api/search` — live pipeline (503 without keys)
-- `POST /api/search/mock` — deterministic clean/ipi fixtures
+- `POST /api/search` — live agent pipeline (503 without `TAVILY_API_KEY` / `CURSOR_API_KEY`)
+- `POST /api/search/mock` — deterministic MCP tools on fixtures
 
 ## 5. UI
 
-Split-screen SOC dashboard: telemetry left, sanitized output right. Live/Mock toggle. Adversarial suite presets.
+Split-screen SOC dashboard: telemetry + MCP tool trace left, sanitized output right. Live/Mock toggle. Adversarial suite presets.

@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DeInject — Context Isolation Firewall",
+  title: "DeInject — Web Search Context Firewall",
   description:
-    "Segmented context-isolation firewall for web search against IPI and ad hijacking.",
+    "Judge-ready demo: segmented context isolation against indirect prompt injection and ad hijacking in agentic web search.",
 };
 
 export default function RootLayout({

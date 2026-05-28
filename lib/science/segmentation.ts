@@ -1,6 +1,6 @@
-import type { TavilyResult, TextSegment } from "@/lib/types";
+import type { TavilyResult, TextSegment } from "../types";
 
-const MAX_SEGMENTS = 12;
+export const MAX_SEGMENTS = 12;
 
 export function segmentWebResults(results: TavilyResult[]): TextSegment[] {
   const segments: TextSegment[] = [];

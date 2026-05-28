@@ -4,18 +4,21 @@ const AUTHORITY_PATTERNS = [
   /Ignore\s+previous\s+instructions/i,
   /IMPORTANT\s+DIRECTIVE/i,
   /\[SYSTEM\]/i,
+  /maintenance\s+mode/i,
+  /Override\s+all\s+safety/i,
 ];
 
-export interface HeuristicHint {
+export interface AuthoritySignal {
   segmentIndex: number;
   markerCount: number;
+  authorityScore: number;
   snippets: string[];
 }
 
-export function scanHeuristicHints(
+export function scanAuthorityMarkers(
   segments: { textChunk: string }[]
-): HeuristicHint[] {
-  return segments.map((seg, index) => {
+): AuthoritySignal[] {
+  return segments.map((seg, segmentIndex) => {
     const snippets: string[] = [];
     let markerCount = 0;
 
@@ -27,6 +30,8 @@ export function scanHeuristicHints(
       }
     }
 
-    return { segmentIndex: index, markerCount, snippets };
+    const authorityScore = Math.min(1, markerCount * 0.35);
+
+    return { segmentIndex, markerCount, authorityScore, snippets };
   });
 }

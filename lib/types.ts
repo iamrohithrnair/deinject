@@ -31,11 +31,21 @@ export interface AdUnit {
   isSafe: boolean;
 }
 
+export interface ToolTraceEntry {
+  tool: string;
+  summary: string;
+}
+
 export interface SearchResponse {
   answer: string;
   telemetry: SecurityTelemetry;
   segmentsProcessed: TextSegment[];
   advertisement: AdUnit;
+  toolTrace?: ToolTraceEntry[];
+  agentRunId?: string;
+  pipelineMode?: "agent" | "mock-tools";
+  mock?: boolean;
+  scenario?: "clean" | "ipi";
 }
 
 export interface TavilyResult {

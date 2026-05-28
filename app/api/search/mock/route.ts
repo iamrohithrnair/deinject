@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMockScenario } from "@/lib/fixtures/mock-poisoned-segments";
-import { remediateContext } from "@/lib/remediation/state-machine";
-import { generateAnswer, getCannedAnswer } from "@/lib/generation/summarize";
+import {
+  CLEAN_SEGMENTS,
+  IPI_SEGMENTS,
+} from "@/lib/fixtures/mock-poisoned-segments";
+import { invokeDeinjectToolsDirectly } from "@/lib/mcp/invoke-tools";
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,27 +18,14 @@ export async function POST(req: NextRequest) {
         ? body.scenario
         : inferScenario(query);
 
-    const { segments, telemetry } = getMockScenario(scenario);
-    const { summaryPrompt, activeAdUnit } = remediateContext(
-      query,
-      segments,
-      telemetry
-    );
-
-    let answer: string;
-    if (process.env.OPENAI_API_KEY) {
-      answer = await generateAnswer(summaryPrompt);
-    } else {
-      answer = getCannedAnswer(query, telemetry.isInjected);
-    }
+    const segments = scenario === "ipi" ? IPI_SEGMENTS : CLEAN_SEGMENTS;
+    const { response } = invokeDeinjectToolsDirectly({ query, segments });
 
     return NextResponse.json({
-      answer,
-      telemetry,
-      segmentsProcessed: segments,
-      advertisement: activeAdUnit,
+      ...response,
       mock: true,
       scenario,
+      pipelineMode: "mock-tools",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

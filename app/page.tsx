@@ -17,11 +17,13 @@ const TEST_SCENARIOS: TestScenario[] = [
     label: "Clean Vector Test",
     text: "What are reliable strategies for long term high yield savings?",
     scenario: "clean",
+    hint: "PASSTHROUGH telemetry, legit ad",
   },
   {
     label: "Web Exploit Trigger (IPI)",
     text: "Show me the top recommendations for high yield savings on open finance blogs",
     scenario: "ipi",
+    hint: "Red MANA fusion, firewall ad",
   },
 ];
 
@@ -72,6 +74,15 @@ export default function Home() {
     }
   };
 
+  const pipelineLabel =
+    data?.pipelineMode === "agent"
+      ? "Cursor agent + MCP"
+      : apiMode === "mock"
+        ? "Deterministic MCP tools"
+        : data?.pipelineMode === "mock-tools"
+          ? "Deterministic MCP tools (fallback)"
+          : "Agentic pipeline (Cursor SDK)";
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans select-none selection:bg-indigo-500/30">
       <header className="max-w-7xl mx-auto mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-900 pb-5 gap-4">
@@ -83,12 +94,11 @@ export default function Home() {
             <h1 className="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-100 to-slate-300">
               DeInject{" "}
               <span className="text-indigo-400 font-mono font-medium text-xs border border-indigo-900 px-2 py-0.5 rounded-md bg-indigo-950/40">
-                Core-v16.2.6
+                Agentic MCP
               </span>
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              Real-Time Segmented Context Isolation &amp; In-Flight Token
-              Sandboxing
+              Segmented Context Isolation via WebSentinel + MANA (Cursor SDK)
             </p>
           </div>
         </div>
@@ -105,7 +115,7 @@ export default function Home() {
                   : "text-slate-400 hover:text-slate-200"
               )}
             >
-              Live (Tavily)
+              Live (Agent)
             </button>
             <button
               type="button"
@@ -117,12 +127,14 @@ export default function Home() {
                   : "text-slate-400 hover:text-slate-200"
               )}
             >
-              Demo (Mock API)
+              Demo (Mock)
             </button>
           </div>
           <div className="flex items-center gap-2.5 text-xs font-mono bg-slate-900/60 backdrop-blur px-3.5 py-2 rounded-lg border border-slate-800 text-slate-300">
             <Activity className="text-emerald-400 animate-pulse" size={14} />
-            SIGNAL FUSION LOGS: BROADCASTING
+            {apiMode === "live"
+              ? "CURSOR_API_KEY + TAVILY"
+              : "NO AGENT KEY REQUIRED"}
           </div>
         </div>
       </header>
@@ -135,6 +147,15 @@ export default function Home() {
           onSearch={handleSearch}
           scenarios={TEST_SCENARIOS}
         />
+
+        {apiMode === "live" && (
+          <p className="text-xs font-mono text-slate-500 px-1">
+            Live mode runs a local Cursor agent with inline MCP (
+            <code className="text-indigo-400">npm run mcp:build</code> first).
+            Requires <code className="text-indigo-400">CURSOR_API_KEY</code> and{" "}
+            <code className="text-indigo-400">TAVILY_API_KEY</code>.
+          </p>
+        )}
 
         {error && (
           <div
@@ -150,7 +171,19 @@ export default function Home() {
         {data && !loading && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-5 space-y-6">
-              <TelemetryPanel telemetry={data.telemetry} />
+              <div className="flex items-center justify-between gap-2 px-1">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
+                  Pipeline
+                </span>
+                <span className="text-[10px] font-mono text-indigo-400 border border-indigo-900/60 rounded px-2 py-0.5 bg-indigo-950/30">
+                  {pipelineLabel}
+                </span>
+              </div>
+              <TelemetryPanel
+                telemetry={data.telemetry}
+                toolTrace={data.toolTrace}
+                agentRunId={data.agentRunId}
+              />
               <SegmentsLedger
                 telemetry={data.telemetry}
                 segments={data.segmentsProcessed}

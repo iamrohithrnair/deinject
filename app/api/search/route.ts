@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { runDeinjectAgent } from "@/lib/agent/run-pipeline";
+import { hasCursorApiKey, CURSOR_API_KEY_ENV } from "@/lib/agent/env";
 import { searchWeb } from "@/lib/ingestion/tavily";
-import { segmentWebResults } from "@/lib/segmentation/web-sentinel";
-import { scanHeuristicHints } from "@/lib/firewall/heuristics";
-import { evaluateSegments } from "@/lib/firewall/evaluator";
-import { remediateContext } from "@/lib/remediation/state-machine";
-import { generateAnswer } from "@/lib/generation/summarize";
+import { segmentWebResults } from "@/lib/science/segmentation";
+
+export const maxDuration = 120;
 
 function missingKeysResponse() {
   return NextResponse.json(
     {
-      error:
-        "Live search requires TAVILY_API_KEY and OPENAI_API_KEY in .env.local",
+      error: `Live search requires TAVILY_API_KEY and ${CURSOR_API_KEY_ENV} in .env.local`,
     },
     { status: 503 }
   );
@@ -18,7 +17,7 @@ function missingKeysResponse() {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!process.env.TAVILY_API_KEY || !process.env.OPENAI_API_KEY) {
+    if (!process.env.TAVILY_API_KEY || !hasCursorApiKey()) {
       return missingKeysResponse();
     }
 
@@ -30,20 +29,13 @@ export async function POST(req: NextRequest) {
 
     const { results } = await searchWeb(query);
     const segments = segmentWebResults(results);
-    const heuristicHints = scanHeuristicHints(segments);
-    const telemetry = await evaluateSegments(query, segments, heuristicHints);
-    const { summaryPrompt, activeAdUnit } = remediateContext(
-      query,
-      segments,
-      telemetry
-    );
-    const answer = await generateAnswer(summaryPrompt);
+
+    const { response, agentRunId } = await runDeinjectAgent(query, segments);
 
     return NextResponse.json({
-      answer,
-      telemetry,
-      segmentsProcessed: segments,
-      advertisement: activeAdUnit,
+      ...response,
+      agentRunId,
+      pipelineMode: "agent",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

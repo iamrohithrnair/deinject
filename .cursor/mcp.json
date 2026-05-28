@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "deinject-science": {
+      "command": "node",
+      "args": ["mcp/deinject-science/dist/index.js"]
+    }
+  }
+}

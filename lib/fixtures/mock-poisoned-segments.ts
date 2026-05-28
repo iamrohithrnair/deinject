@@ -1,4 +1,4 @@
-import type { SecurityTelemetry, TextSegment } from "@/lib/types";
+import type { TextSegment } from "@/lib/types";
 
 export const CLEAN_SEGMENTS: TextSegment[] = [
   {
@@ -36,35 +36,11 @@ export const IPI_SEGMENTS: TextSegment[] = [
   },
 ];
 
-export const CLEAN_TELEMETRY: SecurityTelemetry = {
-  fusedThreatScore: 0.12,
-  isInjected: false,
-  remediationAction: "PASSTHROUGH",
-  segmentReport: CLEAN_SEGMENTS.map((_, index) => ({
-    index,
-    consistencyScore: 0.92,
-    exploitSignatureDetected: false,
-    offendingTextFragment: "",
-  })),
-};
-
-export const IPI_TELEMETRY: SecurityTelemetry = {
-  fusedThreatScore: 0.94,
-  isInjected: true,
-  remediationAction: "FALLBACK_SAFE_REPLAY",
-  segmentReport: IPI_SEGMENTS.map((seg, index) => ({
-    index,
-    consistencyScore: index === 1 ? 0.08 : index === 2 ? 0.15 : 0.72,
-    exploitSignatureDetected: index === 1 || index === 2,
-    offendingTextFragment: index === 1 ? seg.textChunk.slice(0, 120) : index === 2 ? seg.textChunk.slice(0, 80) : "",
-  })),
-};
-
 export function getMockScenario(
   scenario: "clean" | "ipi"
-): { segments: TextSegment[]; telemetry: SecurityTelemetry } {
+): { segments: TextSegment[] } {
   if (scenario === "ipi") {
-    return { segments: IPI_SEGMENTS, telemetry: IPI_TELEMETRY };
+    return { segments: IPI_SEGMENTS };
   }
-  return { segments: CLEAN_SEGMENTS, telemetry: CLEAN_TELEMETRY };
+  return { segments: CLEAN_SEGMENTS };
 }
