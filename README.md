@@ -140,14 +140,157 @@ npm run lint       # ESLint
 npm run record:demo # Capture demo GIF (see Demo section)
 ```
 
-## Architecture
+## Full architecture
 
-- `lib/ingestion/tavily.ts` — web retrieval
-- `lib/science/*` — deterministic WebSentinel + MANA math
-- `mcp/deinject-science/` — stdio MCP server (calculative tools only)
-- `lib/agent/run-pipeline.ts` — Cursor SDK agent + inline MCP
-- `lib/mcp/invoke-tools.ts` — direct in-process tool path for mock demos
-- `.cursor/skills/deinject-*` — orchestration guidance for the agent
+DeInject is a **Next.js 16** app with two execution paths: a **Live (Agent)** pipeline that uses Tavily + Cursor SDK + stdio MCP, and a **Demo (Mock)** path that runs the same science tools deterministically in-process.
+
+### End-to-end pipeline
+
+```
+┌─────────────┐     POST /api/search          POST /api/search/mock
+│  Next.js UI │ ─────────────────────────────────────────────────────►
+│  (page.tsx) │     Live (Agent)              Demo (Mock)
+└─────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│  INGESTION                                                               │
+│  Live:  Tavily Search API (@tavily/core) → top 3 results, advanced depth │
+│  Mock:  Preloaded fixture segments (IPI / clean scenarios)               │
+└──────────────────────────────────────────────────────────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│  WEBSENTINEL SEGMENTATION  (lib/science/segmentation.ts)                 │
+│  Split scraped text into discrete S_i chunks (max 12, min 30 chars)      │
+│  Live: server-side before agent; Mock: websentinel_segment MCP tool      │
+└──────────────────────────────────────────────────────────────────────────┘
+       │
+       ├─────────────────────────────┬──────────────────────────────────────┐
+       ▼                             ▼                                      ▼
+  LIVE PATH                   MOCK PATH                              UI TELEMETRY
+  Cursor SDK Agent            invokeDeinjectToolsDirectly()          TelemetryPanel
+  (@cursor/sdk)               (lib/mcp/invoke-tools.ts)              PipelineSteps
+  composer-2.5 model          same handlers, no LLM                  tool trace log
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│  deinject-science MCP SERVER  (stdio, mcp/deinject-science/)             │
+│  Deterministic science tools — agent must not invent scores              │
+│  MANA fusion → WebSentinel consistency → Remediation FSM → Ad unit       │
+└──────────────────────────────────────────────────────────────────────────┘
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│  OUTPUT: SearchResponse                                                  │
+│  { answer, telemetry (s_t, segmentReport, remediationAction),           │
+│    segmentsProcessed, advertisement, toolTrace, agentRunId }             │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Tavily web ingestion
+
+| | |
+|---|---|
+| **Package** | `@tavily/core` |
+| **Module** | `lib/ingestion/tavily.ts` |
+| **Env** | `TAVILY_API_KEY` |
+| **Config** | `searchDepth: "advanced"`, `maxResults: 3` |
+| **Output** | `{ url, title, content }[]` → fed into WebSentinel segmentation |
+
+Tavily is the live web-retrieval layer. It returns scraped page text that may contain hidden IPI payloads (white-on-white, zero-font-size directives). DeInject never passes that text directly to the LLM — it is segmented and scored first.
+
+### Cursor SDK agent (Live mode)
+
+| | |
+|---|---|
+| **Package** | `@cursor/sdk` |
+| **Module** | `lib/agent/run-pipeline.ts` |
+| **Env** | `CURSOR_API_KEY` |
+| **Model** | `composer-2.5` |
+| **Endpoint** | `POST /api/search` |
+| **MCP wiring** | Inline stdio server: `node mcp/deinject-science/dist/index.js` |
+
+The agent acts as a **security orchestrator**, not a score calculator. It receives the user query plus pre-segmented Tavily content, calls MCP tools in strict order (guided by the `deinject-orchestrator` skill), synthesizes a user-facing answer from sanitized context only, and emits the final `SearchResponse` via `emit_pipeline_result`. If the agent fails to emit structured output, the pipeline falls back to deterministic tool invocation.
+
+```typescript
+// lib/agent/run-pipeline.ts — agent bootstrap
+await using agent = await Agent.create({
+  apiKey,
+  model: { id: "composer-2.5" },
+  local: { cwd: process.cwd(), settingSources: [] },
+});
+
+const run = await agent.send(prompt, {
+  mcpServers: {
+    "deinject-science": {
+      command: "node",
+      args: [mcpPath],
+      env: {},
+    },
+  },
+});
+```
+
+### deinject-science MCP tools
+
+Stdio MCP server built with `@modelcontextprotocol/sdk`. Compiled via `npm run mcp:build` → `mcp/deinject-science/dist/index.js`. Handlers live in `lib/mcp/handlers.ts`; math in `lib/science/*`.
+
+| # | Tool | Framework | Purpose |
+|---|------|-----------|---------|
+| 1 | `websentinel_segment` | WebSentinel | Split Tavily `results[]` into paragraph segments of interest (max 12) |
+| 2 | `mana_scan_authority_markers` | MANA | Regex scan for exploit signatures (`SYSTEM NOTE`, `ignore previous instructions`, etc.) |
+| 3 | `mana_score_contextual_divergence` | MANA | Per-segment topic alignment + high-risk keyword scoring vs. user query |
+| 4 | `mana_fuse_threat_vector` | MANA | Fuse authority + divergence signals into rolling threat vector \(s_t\) (0–1) and `segmentReport[]` |
+| 5 | `websentinel_check_consistency` | WebSentinel | Refine per-segment consistency scores after MANA fusion |
+| 6 | `remediation_select_action` | DeInject FSM | Select `PASSTHROUGH` \| `TARGETED_TRUNCATION` \| `FALLBACK_SAFE_REPLAY` |
+| 7 | `build_sanitized_context` | DeInject | Build truncated context feed + synthesis prompt from safe segments |
+| 8 | `get_vetted_ad_unit` | DeInject | Return legit contextual ad or firewall widget when exploit tripped |
+| 9 | `emit_pipeline_result` | DeInject | Terminal handoff — emit final `{ answer, telemetry, segmentsProcessed, advertisement }` JSON |
+
+**Agent call order** (Live): tools 2 → 7 → 8 → 9. Tool 1 runs server-side before the agent; tool 9 is the structured response handoff.
+
+**Remediation threshold:** `isInjected || fusedThreatScore > 0.60` → truncate or flush poisoned segments, serve firewall ad.
+
+### Cursor skills
+
+Skills in `.cursor/skills/` guide the Cursor SDK agent's orchestration behavior. The agent prompt references `deinject-orchestrator` explicitly.
+
+| Skill | File | Role |
+|-------|------|------|
+| `deinject-orchestrator` | `.cursor/skills/deinject-orchestrator/SKILL.md` | Master pipeline — tool call order, `emit_pipeline_result` contract, no fabricated scores |
+| `deinject-websentinel` | `.cursor/skills/deinject-websentinel/SKILL.md` | Segmented context isolation — never analyze scraped text as one monolithic block |
+| `deinject-mana-fusion` | `.cursor/skills/deinject-mana-fusion/SKILL.md` | Heterogeneous signal fusion — authority markers + divergence → \(s_t\) |
+| `deinject-remediation` | `.cursor/skills/deinject-remediation/SKILL.md` | Remediation FSM — passthrough, targeted truncation, safe replay |
+
+### Science modules (`lib/science/`)
+
+| Module | Implements |
+|--------|------------|
+| `segmentation.ts` | WebSentinel paragraph chunking from Tavily results |
+| `authority.ts` | MANA authority-marker regex signals |
+| `divergence.ts` | MANA topic overlap + risk keyword scoring |
+| `fusion.ts` | MANA \(s_t\) fusion and `isInjected` flag |
+| `consistency.ts` | WebSentinel per-segment consistency refinement |
+| `remediation.ts` | FSM action selection + exploit-trip gate |
+| `context.ts` | Sanitized context feed builder |
+
+### Repo layout
+
+| Path | Role |
+|------|------|
+| `app/page.tsx` | SOC dashboard UI — Live/Mock toggle, adversarial presets, split telemetry/output |
+| `app/api/search/route.ts` | Live pipeline: Tavily → segment → Cursor SDK agent |
+| `app/api/search/mock/route.ts` | Mock pipeline: fixture segments → deterministic tools |
+| `lib/ingestion/tavily.ts` | Tavily Search API client |
+| `lib/agent/run-pipeline.ts` | Cursor SDK agent + inline MCP |
+| `lib/mcp/handlers.ts` | Shared tool handler implementations |
+| `lib/mcp/invoke-tools.ts` | In-process deterministic tool chain (mock + agent fallback) |
+| `mcp/deinject-science/index.ts` | Stdio MCP server exposing all 9 tools |
+| `.cursor/mcp.json` | Local MCP config for Cursor IDE |
+| `.cursor/skills/deinject-*` | Agent orchestration skills |
+| `components/TelemetryPanel.tsx` | Live \(s_t\), segment report, remediation action, tool trace |
+| `lib/fixtures/mock-poisoned-segments.ts` | IPI and clean scenario fixtures |
 
 See [PROMPT.md](PROMPT.md) for the full product specification.
 
